@@ -1222,7 +1222,6 @@ class Ostrato
 		opts = args[0] || Hash.new
 		content = Hash.new
 		self._output = Hash.new
-		group_ids = Array.new
 		required = %w(id)
 		if ((required - opts.keys).length == 0)
 			self._ostrato_request(
@@ -1236,7 +1235,53 @@ class Ostrato
 		end
 	end
 
-	
+	# Generic Items
+    def generic_items(*args)
+        # Works
+        opts = args[0] || Hash.new
+        content = Hash.new
+        self._output = Hash.new
+        required = %w()
+        if ((required - opts.keys).length == 0)
+            self._ostrato_request(
+                "get",
+                sprintf("generic_items"),
+            )
+        else
+            self._success = nil
+            self._errors.push(sprintf("the following required \"%s\" options are missing: %s.", __method__, (required - opts.keys).join(", ")))
+        end
+    end
+
+    def generic_items_products(*args)
+		# Need to be able to find product ID - not there yet
+        opts = args[0] || Hash.new
+        content = Hash.new
+        self._output = Hash.new
+        required = %w(product_name)
+        if ((required - opts.keys).length == 0)
+			product_id = self._product_id(opts["product_name"])
+			if (product_id)
+            	self._ostrato_request(
+            	    "get",
+            	    sprintf("generic_items/products/%s", product_id),
+            	)
+			else
+				self._success = nil
+				self._errors.push(sprintf("failed to fetch the product id for \"%s\".", opts["product_name"]))
+			end
+        else
+            self._success = nil
+            self._errors.push(sprintf("the following required \"%s\" options are missing: %s.", __method__, (required - opts.keys).join(", ")))
+        end
+    end
+
+	def generic_items_update(*args)
+	end
+
+	def generic_items_archive(*args)
+	end
+
 	def _ostrato_request(*args)
 		http_method = args[0]
 		uri = args[1]
