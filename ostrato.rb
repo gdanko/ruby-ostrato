@@ -986,7 +986,6 @@ class Ostrato
 		opts = args[0] || Hash.new
 		content = Hash.new
 		self._output = Hash.new
-		group_ids = Array.new
 		required = %w(name)
 		if ((required - opts.keys).length == 0)
 			credential_id = self._credential_id(opts["name"])
@@ -1009,7 +1008,6 @@ class Ostrato
 		opts = args[0] || Hash.new
 		content = Hash.new
 		self._output = Hash.new
-		group_ids = Array.new
 		required = %w(provider)
 		if ((required - opts.keys).length == 0)
 			self._ostrato_request(
@@ -1022,6 +1020,223 @@ class Ostrato
 		end
 	end
 
+	# Dashboard Management
+	def dashboard_instances(*args)
+		# Works
+		opts = args[0] || Hash.new
+		content = Hash.new
+		self._output = Hash.new
+		required = %w()
+		if ((required - opts.keys).length == 0)
+			self._ostrato_request(
+				"get",
+				"dashboard/instances"
+			)
+		else
+			self._success = nil
+			self._errors.push(sprintf("the following required \"%s\" options are missing: %s.", __method__, (required - opts.keys).join(", ")))
+		end
+	end
+
+	def dashboard_external_data(*args)
+		# Works
+		opts = args[0] || Hash.new
+		content = Hash.new
+		self._output = Hash.new
+		required = %w()
+		if ((required - opts.keys).length == 0)
+			self._ostrato_request(
+				"get",
+				"dashboard/external_data"
+			)
+		else
+			self._success = nil
+			self._errors.push(sprintf("the following required \"%s\" options are missing: %s.", __method__, (required - opts.keys).join(", ")))
+		end
+	end
+
+	def dashboard_spending(*args)
+		# Works
+		opts = args[0] || Hash.new
+		content = Hash.new
+		self._output = Hash.new
+		required = %w()
+		if ((required - opts.keys).length == 0)
+			self._ostrato_request(
+				"get",
+				"dashboard/spending"
+			)
+		else
+			self._success = nil
+			self._errors.push(sprintf("the following required \"%s\" options are missing: %s.", __method__, (required - opts.keys).join(", ")))
+		end
+	end
+
+	def dashboard_widgets_create(*args)
+	end
+
+	def dashboard_widgets_edit(*args)
+	end
+
+	def dashboard_widgets(*args)
+		# Works
+		opts = args[0] || Hash.new
+		content = Hash.new
+		self._output = Hash.new
+		required = %w()
+		if ((required - opts.keys).length == 0)
+			self._ostrato_request(
+				"get",
+				"dashboard/widgets"
+			)
+		else
+			self._success = nil
+			self._errors.push(sprintf("the following required \"%s\" options are missing: %s.", __method__, (required - opts.keys).join(", ")))
+		end
+	end
+
+	# External Instance Data Management
+	def external_data_archive(*args)
+		# Works
+		opts = args[0] || Hash.new
+		content = Hash.new
+		self._output = Hash.new
+		required = %w(id)
+		if ((required - opts.keys).length == 0)
+			self._ostrato_request(
+				"put",
+				sprintf("external_data/instance/%s/archive?value=true", opts["id"])
+			)
+		else
+			self._success = nil
+			self._errors.push(sprintf("the following required \"%s\" options are missing: %s.", __method__, (required - opts.keys).join(", ")))
+		end
+	end
+
+	def external_data_instance(*args)
+		# Works
+		opts = args[0] || Hash.new
+		content = Hash.new
+		self._output = Hash.new
+		required = %w()
+		if ((required - opts.keys).length == 0)
+			self._ostrato_request(
+				"get",
+				"external_data/instance"
+			)
+		else
+			self._success = nil
+			self._errors.push(sprintf("the following required \"%s\" options are missing: %s.", __method__, (required - opts.keys).join(", ")))
+		end
+	end
+
+	def external_data_assignable_groups(*args)
+		# Works
+		opts = args[0] || Hash.new
+		content = Hash.new
+		self._output = Hash.new
+		required = %w()
+		if ((required - opts.keys).length == 0)
+			self._ostrato_request(
+				"get",
+				"external_data/instance/groups"
+			)
+		else
+			self._success = nil
+			self._errors.push(sprintf("the following required \"%s\" options are missing: %s.", __method__, (required - opts.keys).join(", ")))
+		end
+	end
+
+	def external_data_instance_create(*args)
+		# Works
+		opts = args[0] || Hash.new
+		content = Hash.new
+		self._output = Hash.new
+		group_ids = Array.new
+		required = %w(name url_prefix url_port url_suffix groups)
+		if ((required - opts.keys).length == 0)
+			opts["groups"].split(/\s*,\s*/).each do |group_name|
+				group_id = self._group_id(group_name)
+				group_ids.push(group_id) if group_id
+			end
+
+			if (group_ids.length > 0)
+				content["name"] = opts["name"] # www.something.com
+				content["url_prefix"] = opts["url_prefix"] # http|https
+				content["url_port"] = opts["url_port"] # 0 - 65535
+				content["url_suffix"] = opts["url_suffix"] # /ipad
+				content["user_defined"] = opts["user_defined"] || {}
+				content["groups"] = group_ids
+				self._ostrato_request(
+					"post",
+					"external_data/instance",
+					content
+				)
+			else
+				self._success = nil
+				self._errors.push(sprintf("could not find a valid group id for at least one group name."))
+			end
+		else
+			self._success = nil
+			self._errors.push(sprintf("the following required \"%s\" options are missing: %s.", __method__, (required - opts.keys).join(", ")))
+		end
+	end
+
+	def external_data_instance_edit(*args)
+		# Works
+		opts = args[0] || Hash.new
+		content = Hash.new
+		self._output = Hash.new
+		group_ids = Array.new
+		required = %w(id name url_prefix url_port url_suffix groups)
+		if ((required - opts.keys).length == 0)
+			opts["groups"].split(/\s*,\s*/).each do |group_name|
+				group_id = self._group_id(group_name)
+				group_ids.push(group_id) if group_id
+			end
+
+			if (group_ids.length > 0)
+				content["name"] = opts["name"] # www.something.com
+				content["url_prefix"] = opts["url_prefix"] # http|https
+				content["url_port"] = opts["url_port"] # 0 - 65535
+				content["url_suffix"] = opts["url_suffix"] # /ipad
+				content["user_defined"] = opts["user_defined"] || {}
+				content["groups"] = group_ids
+				self._ostrato_request(
+					"put",
+					sprintf("external_data/instance/%s", opts["id"]),
+					content
+				)
+			else
+				self._success = nil
+				self._errors.push(sprintf("could not find a valid group id for at least one group name."))
+			end
+		else
+			self._success = nil
+			self._errors.push(sprintf("the following required \"%s\" options are missing: %s.", __method__, (required - opts.keys).join(", ")))
+		end
+	end
+
+	def external_data_instance_get(*args)
+		# Works
+		opts = args[0] || Hash.new
+		content = Hash.new
+		self._output = Hash.new
+		group_ids = Array.new
+		required = %w(id)
+		if ((required - opts.keys).length == 0)
+			self._ostrato_request(
+				"get",
+				sprintf("external_data/instance/%s", opts["id"]),
+				content
+			)
+		else
+			self._success = nil
+			self._errors.push(sprintf("the following required \"%s\" options are missing: %s.", __method__, (required - opts.keys).join(", ")))
+		end
+	end
+
+	
 	def _ostrato_request(*args)
 		http_method = args[0]
 		uri = args[1]
