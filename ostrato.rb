@@ -1236,50 +1236,370 @@ class Ostrato
 	end
 
 	# Generic Items
-    def generic_items(*args)
-        # Works
-        opts = args[0] || Hash.new
-        content = Hash.new
-        self._output = Hash.new
-        required = %w()
-        if ((required - opts.keys).length == 0)
-            self._ostrato_request(
-                "get",
-                sprintf("generic_items"),
-            )
-        else
-            self._success = nil
-            self._errors.push(sprintf("the following required \"%s\" options are missing: %s.", __method__, (required - opts.keys).join(", ")))
-        end
-    end
+	def generic_items(*args)
+		# Works
+		opts = args[0] || Hash.new
+		content = Hash.new
+		self._output = Hash.new
+		required = %w()
+		if ((required - opts.keys).length == 0)
+			self._ostrato_request(
+				"get",
+				sprintf("generic_items"),
+			)
+		else
+			self._success = nil
+			self._errors.push(sprintf("the following required \"%s\" options are missing: %s.", __method__, (required - opts.keys).join(", ")))
+		end
+	end
 
-    def generic_items_products(*args)
+	def generic_items_products(*args)
 		# Need to be able to find product ID - not there yet
-        opts = args[0] || Hash.new
-        content = Hash.new
-        self._output = Hash.new
-        required = %w(product_name)
-        if ((required - opts.keys).length == 0)
+		opts = args[0] || Hash.new
+		content = Hash.new
+		self._output = Hash.new
+		required = %w(product_name)
+		if ((required - opts.keys).length == 0)
 			product_id = self._product_id(opts["product_name"])
 			if (product_id)
-            	self._ostrato_request(
-            	    "get",
-            	    sprintf("generic_items/products/%s", product_id),
-            	)
+				self._ostrato_request(
+					"get",
+					sprintf("generic_items/products/%s", product_id),
+				)
 			else
 				self._success = nil
 				self._errors.push(sprintf("failed to fetch the product id for \"%s\".", opts["product_name"]))
 			end
-        else
-            self._success = nil
-            self._errors.push(sprintf("the following required \"%s\" options are missing: %s.", __method__, (required - opts.keys).join(", ")))
-        end
-    end
+		else
+			self._success = nil
+			self._errors.push(sprintf("the following required \"%s\" options are missing: %s.", __method__, (required - opts.keys).join(", ")))
+		end
+	end
 
 	def generic_items_update(*args)
 	end
 
 	def generic_items_archive(*args)
+	end
+
+	# Get Item Pricing
+	def marketplace_pricing(*args)
+		# Need more info here
+	end
+
+	# Group Management
+	def groups_archive(*args)
+		opts = args[0] || Hash.new
+		content = Hash.new
+		self._output = Hash.new
+		required = %w()
+		if ((required - opts.keys).length == 0)
+			self._ostrato_request(
+				"get",
+				# Make configurable
+				sprintf("groups?hierarchy=1"),
+			)
+		else
+			self._success = nil
+			self._errors.push(sprintf("the following required \"%s\" options are missing: %s.", __method__, (required - opts.keys).join(", ")))
+		end
+	end
+
+	def groups(*args)
+		# Works
+		opts = args[0] || Hash.new
+		content = Hash.new
+		self._output = Hash.new
+		required = %w()
+		if ((required - opts.keys).length == 0)
+			self._ostrato_request(
+				"get",
+				# Make configurable
+				sprintf("groups?hierarchy=1"),
+			)
+		else
+			self._success = nil
+			self._errors.push(sprintf("the following required \"%s\" options are missing: %s.", __method__, (required - opts.keys).join(", ")))
+		end
+	end
+
+	def groups_assignable_groups(*args)
+		# Works
+		opts = args[0] || Hash.new
+		content = Hash.new
+		self._output = Hash.new
+		required = %w()
+		if ((required - opts.keys).length == 0)
+			self._ostrato_request(
+				"get",
+				sprintf("groups/parents")
+			)
+		else
+			self._success = nil
+			self._errors.push(sprintf("the following required \"%s\" options are missing: %s.", __method__, (required - opts.keys).join(", ")))
+		end
+	end
+
+	def groups_assignable_parent_group(*args)
+		# Works
+		opts = args[0] || Hash.new
+		content = Hash.new
+		self._output = Hash.new
+		required = %w(group_name)
+		if ((required - opts.keys).length == 0)
+			group_id = self._group_id(opts["group_name"])
+			if (group_id)
+				self._ostrato_request(
+					"get",
+					sprintf("groups/%s/parents", group_id)
+				)
+			else
+				self._success = nil
+				self._errors.push(sprintf("failed to fetch the group id for \"%s\".", opts["group_name"]))
+			end
+		else
+			self._success = nil
+			self._errors.push(sprintf("the following required \"%s\" options are missing: %s.", __method__, (required - opts.keys).join(", ")))
+		end
+	end
+
+	def groups_create(*args)
+		# Works
+		opts = args[0] || Hash.new
+		content = Hash.new
+		self._output = Hash.new
+		required = %w(group_name parent_group_name)
+		if ((required - opts.keys).length == 0)
+			group_id = self._group_id(opts["parent_group_name"])
+			if (group_id)
+				content["name"] = opts["group_name"]
+				content["parent_groups_id"] = group_id
+				content["approval_required"] = opts["approval_required"] == 1 ? 1 : 0
+				self._ostrato_request(
+					"post",
+					sprintf("groups"),
+					content
+				)
+			else
+				self._success = nil
+				self._errors.push(sprintf("failed to fetch the group id for \"%s\".", opts["parent_group_name"]))
+			end
+		else
+			self._success = nil
+			self._errors.push(sprintf("the following required \"%s\" options are missing: %s.", __method__, (required - opts.keys).join(", ")))
+		end
+	end
+
+	def groups_edit(*args)
+		# Works
+		opts = args[0] || Hash.new
+		content = Hash.new
+		self._output = Hash.new
+		required = %w(group_name parent_group_name)
+		if ((required - opts.keys).length == 0)
+			group_id = self._group_id(opts["group_name"])
+			parent_group_id = self._group_id(opts["parent_group_name"])
+			# You will want to combine error messages so that one message can trap both conditions
+			unless (group_id)
+				self._success = nil
+				self._errors.push(sprintf("failed to fetch the group id for \"%s\".", opts["group_name"]))
+				return
+			end
+
+			unless (parent_group_id)
+				self._success = nil
+				self._errors.push(sprintf("failed to fetch the group id for \"%s\".", opts["parent_group_name"]))
+				return
+			end
+
+			content["name"] = opts["new_group_name"] if opts["new_group_name"]
+			content["parent_groups_id"] = parent_group_id
+			content["approval_required"] = opts["approval_required"] == 1 ? 1 : 0
+			self._ostrato_request(
+				"put",
+				sprintf("groups/%s", group_id),
+				content
+			)
+		else
+			self._success = nil
+			self._errors.push(sprintf("the following required \"%s\" options are missing: %s.", __method__, (required - opts.keys).join(", ")))
+		end
+	end
+
+	def groups_get(*args)
+		# Works
+		opts = args[0] || Hash.new
+		content = Hash.new
+		self._output = Hash.new
+		required = %w(group_name)
+		if ((required - opts.keys).length == 0)
+			group_id = self._group_id(opts["group_name"])
+			unless (group_id)
+				self._success = nil
+				self._errors.push(sprintf("failed to fetch the group id for \"%s\".", opts["group_name"]))
+				return
+			end
+
+			self._ostrato_request(
+				"get",
+				sprintf("groups/%s", group_id)
+			)
+		else
+			self._success = nil
+			self._errors.push(sprintf("the following required \"%s\" options are missing: %s.", __method__, (required - opts.keys).join(", ")))
+		end
+	end
+
+	# Manage Compute Items v22.x
+
+	# Manage Ingestions
+	def ingestions(*args)
+		# Works
+		opts = args[0] || Hash.new
+		content = Hash.new
+		self._output = Hash.new
+		required = %w()
+		if ((required - opts.keys).length == 0)
+			self._ostrato_request(
+				"get",
+				sprintf("ingestions")
+			)
+		else
+			self._success = nil
+			self._errors.push(sprintf("the following required \"%s\" options are missing: %s.", __method__, (required - opts.keys).join(", ")))
+		end
+	end
+
+	def ingest(*args)
+		# Works
+		opts = args[0] || Hash.new
+		content = Hash.new
+		self._output = Hash.new
+		required = %w()
+		if ((required - opts.keys).length == 0)
+			self._ostrato_request(
+				"post",
+				sprintf("ingestions")
+			)
+		else
+			self._success = nil
+			self._errors.push(sprintf("the following required \"%s\" options are missing: %s.", __method__, (required - opts.keys).join(", ")))
+		end
+	end
+
+	def ingestions_groups(*args)
+		# Works
+		opts = args[0] || Hash.new
+		content = Hash.new
+		self._output = Hash.new
+		required = %w()
+		if ((required - opts.keys).length == 0)
+			self._ostrato_request(
+				"get",
+				sprintf("ingestions/groups")
+			)
+		else
+			self._success = nil
+			self._errors.push(sprintf("the following required \"%s\" options are missing: %s.", __method__, (required - opts.keys).join(", ")))
+		end
+	end
+
+	def ingest_group_cred(*args)
+		# Works
+		opts = args[0] || Hash.new
+		content = Hash.new
+		self._output = Hash.new
+		required = %w(cred_name group_name)
+		if ((required - opts.keys).length == 0)
+			group_id = self._group_id(opts["group_name"])
+			cred_id = self._credential_id(opts["cred_name"])
+			# You will want to combine error messages so that one message can trap both conditions
+			unless (group_id)
+				self._success = nil
+				self._errors.push(sprintf("failed to fetch the group id for \"%s\".", opts["group_name"]))
+				return
+			end
+
+			unless (cred_id)
+				self._success = nil
+				self._errors.push(sprintf("failed to fetch the credential id for \"%s\".", opts["cred_name"]))
+				return
+			end
+			
+			self._ostrato_request(
+				"post",
+				sprintf("ingestions/creds/%s/groups/%s", cred_id, group_id)
+			)
+		else
+			self._success = nil
+			self._errors.push(sprintf("the following required \"%s\" options are missing: %s.", __method__, (required - opts.keys).join(", ")))
+		end
+	end
+
+	def ingestions_creds_latest(*args)
+		# Works
+		opts = args[0] || Hash.new
+		content = Hash.new
+		self._output = Hash.new
+		required = %w(cred_name)
+		if ((required - opts.keys).length == 0)
+			cred_id = self._credential_id(opts["cred_name"])
+			# You will want to combine error messages so that one message can trap both conditions
+			unless (cred_id)
+				self._success = nil
+				self._errors.push(sprintf("failed to fetch the credential id for \"%s\".", opts["cred_name"]))
+				return
+			end
+
+			self._ostrato_request(
+				"get",
+				sprintf("ingestions/creds/%s/latest", cred_id)
+			)
+		else
+			self._success = nil
+			self._errors.push(sprintf("the following required \"%s\" options are missing: %s.", __method__, (required - opts.keys).join(", ")))
+		end
+	end
+
+	# Marketplace (Catalog)
+	def catalogs_products(*args)
+		opts = args[0] || Hash.new
+		content = Hash.new
+		self._output = Hash.new
+		required = %w()
+		if ((required - opts.keys).length == 0)
+			self._ostrato_request(
+				"get",
+				sprintf("catalogs/products")
+			)
+		else
+			self._success = nil
+			self._errors.push(sprintf("the following required \"%s\" options are missing: %s.", __method__, (required - opts.keys).join(", ")))
+		end
+	end
+
+	def catalogs_products_create(*args)
+		# 401
+		opts = args[0] || Hash.new
+		content = Hash.new
+		self._output = Hash.new
+		required = %w(base_price description price_time_unit title)
+		if ((required - opts.keys).length == 0)
+			content["cloud_service_type"] = "generic"
+			content["base_price"] = opts["base_price"]
+			content["description"] = opts["description"]
+			content["price_time_unit"] = opts["price_time_unit"]
+			content["title"] = opts["title"]
+			content["groups"] = ["1025"]
+			self._ostrato_request(
+				"post",
+				sprintf("catalogs/products"),
+				content
+			)
+		else
+			self._success = nil
+			self._errors.push(sprintf("the following required \"%s\" options are missing: %s.", __method__, (required - opts.keys).join(", ")))
+		end
 	end
 
 	def _ostrato_request(*args)
