@@ -2181,48 +2181,48 @@ class Ostrato
 		end
 	end
 
-    def networks_subnets_create(*args)
-        # 403
+	def networks_subnets_create(*args)
+		# 403
 		# Need to understand the dependencies for subnets
-        opts = args[0] || Hash.new
-        content = Hash.new
-        self._output = Hash.new
-        required = %w(network_name private_cloud_name cidr_block name deployed_locations)
-        if ((required - opts.keys).length == 0)
-            network_id, private_cloud_id = nil, nil
-            self.networks_private_clouds({"network_name" => opts["network_name"]})
-            if (self.success)
-                self.output.each do |private_cloud|
-                    if (private_cloud["name"] == opts["private_cloud_name"])
-                        network_id = private_cloud["network_id"]
-                        private_cloud_id = private_cloud["id"]
-                        self._output = Hash.new
-                        break
-                    end
-                end
+		opts = args[0] || Hash.new
+		content = Hash.new
+		self._output = Hash.new
+		required = %w(network_name private_cloud_name cidr_block name deployed_locations)
+		if ((required - opts.keys).length == 0)
+			network_id, private_cloud_id = nil, nil
+			self.networks_private_clouds({"network_name" => opts["network_name"]})
+			if (self.success)
+				self.output.each do |private_cloud|
+					if (private_cloud["name"] == opts["private_cloud_name"])
+						network_id = private_cloud["network_id"]
+						private_cloud_id = private_cloud["id"]
+						self._output = Hash.new
+						break
+					end
+				end
 
-                if (network_id && private_cloud_id)
+				if (network_id && private_cloud_id)
 					content["cidr_block"] = opts["cidr_block"]
 					content["name"] = opts["name"]
 					content["deployed_locations"] = opts["deployed_locations"]
-                    self._ostrato_request(
-                        "post",
-                        sprintf("networks/%s/private_clouds/%s/subnets", network_id, private_cloud_id),
+					self._ostrato_request(
+						"post",
+						sprintf("networks/%s/private_clouds/%s/subnets", network_id, private_cloud_id),
 						content
-                    )
-                else
-                    self._success = nil
-                    self._errors.push(sprintf("failed to get network id and/or private cloud id."))
-                end
-            else
-                self._success = nil
-                self._errors.push(sprintf("failed to get a list of private clouds for %s.", opts["network_name"]))
-            end
-        else
-            self._success = nil
-            self._errors.push(sprintf("the following required \"%s\" options are missing: %s.", __method__, (required - opts.keys).join(", ")))
-        end
-    end
+					)
+				else
+					self._success = nil
+					self._errors.push(sprintf("failed to get network id and/or private cloud id."))
+				end
+			else
+				self._success = nil
+				self._errors.push(sprintf("failed to get a list of private clouds for %s.", opts["network_name"]))
+			end
+		else
+			self._success = nil
+			self._errors.push(sprintf("the following required \"%s\" options are missing: %s.", __method__, (required - opts.keys).join(", ")))
+		end
+	end
 
 	def _ostrato_request(*args)
 		http_method = args[0]
