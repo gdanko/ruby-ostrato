@@ -112,8 +112,39 @@ class Ostrato
 		return self._id(name, "projects", "name", "id")
 	end
 
+	def _product_id(name)
+		return self._id(name, "catalogs/products", "name", "id")
+	end
+
 	def _credential_id(name)
 		return self._id(name, "creds", "name", "id")
+	end
+
+	def _network_id(name)
+		return self._id(name, "networks", "name", "id")
+	end
+
+	def _instance_id(name)
+		output = nil
+		content = Hash.new
+		items = Array.new
+		self._output = Hash.new
+		self._ostrato_request(
+			"get",
+			"/cloud_services/set/ostrato?offset=1&limit=9999"
+		)
+		if (self.success)
+			if (self.output["items"])
+				self.output["items"].each do |item|
+					if (item["name"] == name)
+						output = item["id"]
+						break
+					end
+				end
+			end
+		end
+		self._output = Hash.new
+		return output
 	end
 
 	def _parse(array, output, name_key, id_key)
@@ -793,6 +824,25 @@ class Ostrato
 	end
 
 	# Cloud Services Management
+	def cloud_services_set(*args)
+		opts = args[0] || Hash.new
+		content = Hash.new
+		self._output = Hash.new
+		required = %w()
+		if ((required - opts.keys).length == 0)
+			set_name = opts["set_name"] || "ostrato"
+			offset = opts["offset"] || "1"
+			limit = opts["limit"] || "9999"
+			
+			self._ostrato_request(
+			   "get",
+				sprintf("cloud_services/set/%s?offset=%s&limit=%s", set_name, offset, limit)
+			)
+		else
+			self._success = nil
+			self._errors.push(sprintf("the following required \"%s\" options are missing: %s.", __method__, (required - opts.keys).join(", ")))
+		end
+	end
 
 	# Credential Management
 	def creds_ssh_keys_generate(*args)
@@ -1562,7 +1612,58 @@ class Ostrato
 	end
 
 	# Marketplace (Catalog)
+	def catalogs_products_assignable_groups(*args)
+		# Works
+		opts = args[0] || Hash.new
+		content = Hash.new
+		self._output = Hash.new
+		required = %w()
+		if ((required - opts.keys).length == 0)
+			self._ostrato_request(
+				"get",
+				sprintf("catalogs/products/groups")
+			)
+		else
+			self._success = nil
+			self._errors.push(sprintf("the following required \"%s\" options are missing: %s.", __method__, (required - opts.keys).join(", ")))
+		end
+	end
+
+	# get external supplied product option choices???? need to wait on this one
+
+	def catalogs_products_archive(*args)
+		# Nope. Need to be able to create a product. WHERE???
+		opts = args[0] || Hash.new
+		content = Hash.new
+		self._output = Hash.new
+		required = %w(product_name)
+		if ((required - opts.keys).length == 0)
+			product_id = self._product_id(opts["product_name"])
+			unless (product_id)
+				self._success = nil
+				self._errors.push(sprintf("failed to fetch the product id for \"%s\".", opts["product_name"]))
+				return
+			end
+			self._ostrato_request(
+				"put",
+				sprintf("catalogs/products/%s/archive?value=true", product_id)
+			)
+		else
+			self._success = nil
+			self._errors.push(sprintf("the following required \"%s\" options are missing: %s.", __method__, (required - opts.keys).join(", ")))
+		end
+	end
+
 	def catalogs_products(*args)
+		# Works
+		# Add QS options
+		# _admin: when set to 1, indicates that the products in the response include all products that the user can manage. If 0, then the response will contain only the products a user can order for their current group. Any other value for this parameter is invalid.
+		# _provider: the ID of the provider you would like to filter the results on.
+		# _cloud_service_type: the name of the cloud service type you would like to filter the results on.
+		# _orderable: true|false. used when admin only wants orderable products returned.
+		# _range: <min,max> is the minimum and maximum price range, reduces the set of products based on a price range.
+		# _search: is a list of words separate by a space that should be text searched against: provider, cloud service type, title, and description.
+		# <filter_label>: any other word will indicate a product option filter_label that is used to reduce the set of products.
 		opts = args[0] || Hash.new
 		content = Hash.new
 		self._output = Hash.new
@@ -1579,21 +1680,353 @@ class Ostrato
 	end
 
 	def catalogs_products_create(*args)
-		# 401
+		# Works
 		opts = args[0] || Hash.new
 		content = Hash.new
 		self._output = Hash.new
-		required = %w(base_price description price_time_unit title)
+		required = %w(base_price description price_time_unit title options groups)
+		group_ids = Array.new
+
 		if ((required - opts.keys).length == 0)
-			content["cloud_service_type"] = "generic"
-			content["base_price"] = opts["base_price"]
-			content["description"] = opts["description"]
-			content["price_time_unit"] = opts["price_time_unit"]
-			content["title"] = opts["title"]
-			content["groups"] = ["1025"]
+			opts["groups"].split(/\s*,\s*/).each do |group_name|
+				group_id = self._group_id(group_name)
+				group_ids.push(group_id) if group_id
+			end
+
+			if (group_ids.length > 0)
+				content["base_price"] = opts["base_price"]
+				content["description"] = opts["description"]
+				content["price_time_unit"] = opts["price_time_unit"]
+				content["title"] = opts["title"]
+				content["options"] = opts["options"]
+
+				content["cloud_service_type"] = "generic"
+				content["groups"] = group_ids
+				self._ostrato_request(
+					"post",
+					sprintf("catalogs/products"),
+					content
+				)
+			else
+				self._success = nil
+				self._errors.push(sprintf("could not find a valid group id for at least one group name."))
+			end
+		else
+			self._success = nil
+			self._errors.push(sprintf("the following required \"%s\" options are missing: %s.", __method__, (required - opts.keys).join(", ")))
+		end
+	end
+
+	def catalogs_products_get(*args)
+	end
+
+	def carts_products_get(*args)
+	end
+
+	# Metrics
+	def metrics_offenders(*args)
+		# Works
+		opts = args[0] || Hash.new
+		content = Hash.new
+		self._output = Hash.new
+		required = %w(metric_name operator threshold interval)
+		if ((required - opts.keys).length == 0)
+			self._ostrato_request(
+				"get",
+				sprintf(
+					"metrics/offenders/%s?operator=%s&threshold=%s&interval=%s",
+					opts["metric_name"],
+					opts["operator"],
+					opts["threshold"],
+					opts["interval"]
+				)
+			)
+		else
+			self._success = nil
+			self._errors.push(sprintf("the following required \"%s\" options are missing: %s.", __method__, (required - opts.keys).join(", ")))
+		end
+	end
+
+	def cloud_services_metrics(*args)
+		# Works
+		opts = args[0] || Hash.new
+		content = Hash.new
+		self._output = Hash.new
+		required = %w(instance_name interval)
+		if ((required - opts.keys).length == 0)
+			instance_id = self._instance_id(opts["instance_name"])
+			unless (instance_id)
+				self._success = nil
+				self._errors.push(sprintf("failed to fetch the instance id for \"%s\".", opts["instance_name"]))
+				return
+			end
+			self._ostrato_request(
+				"get",
+				sprintf("cloud_services/%s/metrics?interval=%s", instance_id, opts["interval"])
+			)
+		else
+			self._success = nil
+			self._errors.push(sprintf("the following required \"%s\" options are missing: %s.", __method__, (required - opts.keys).join(", ")))
+		end
+	end
+
+	def metrics_list_intervals(*args)
+		# Works
+		opts = args[0] || Hash.new
+		content = Hash.new
+		self._output = Hash.new
+		required = %w()
+		if ((required - opts.keys).length == 0)
+			self._ostrato_request(
+				"get",
+				sprintf("metrics/list/intervals")
+			)
+		else
+			self._success = nil
+			self._errors.push(sprintf("the following required \"%s\" options are missing: %s.", __method__, (required - opts.keys).join(", ")))
+		end
+	end
+
+	def metrics_list_metrics(*args)
+		# Works
+		opts = args[0] || Hash.new
+		content = Hash.new
+		self._output = Hash.new
+		required = %w()
+		if ((required - opts.keys).length == 0)
+			self._ostrato_request(
+				"get",
+				sprintf("metrics/list/metrics")
+			)
+		else
+			self._success = nil
+			self._errors.push(sprintf("the following required \"%s\" options are missing: %s.", __method__, (required - opts.keys).join(", ")))
+		end
+	end
+
+	# Network Management
+	def networks(*args)
+		# Works
+		opts = args[0] || Hash.new
+		content = Hash.new
+		self._output = Hash.new
+		required = %w()
+		if ((required - opts.keys).length == 0)
+			self._ostrato_request(
+				"get",
+				sprintf("networks")
+			)
+		else
+			self._success = nil
+			self._errors.push(sprintf("the following required \"%s\" options are missing: %s.", __method__, (required - opts.keys).join(", ")))
+		end
+	end
+
+	def networks_assignable_groups(*args)
+		# Works
+		opts = args[0] || Hash.new
+		content = Hash.new
+		self._output = Hash.new
+		required = %w()
+		if ((required - opts.keys).length == 0)
+			self._ostrato_request(
+				"get",
+				sprintf("networks/groups")
+			)
+		else
+			self._success = nil
+			self._errors.push(sprintf("the following required \"%s\" options are missing: %s.", __method__, (required - opts.keys).join(", ")))
+		end
+	end
+
+	def networks_network_create(*args)
+		opts = args[0] || Hash.new
+		content = Hash.new
+		self._output = Hash.new
+		required = %w(description groups name)
+		group_ids = Array.new
+		if ((required - opts.keys).length == 0)
+			opts["groups"].split(/\s*,\s*/).each do |group_name|
+				group_id = self._group_id(group_name)
+				group_ids.push(group_id) if group_id
+			end
+
+			if (group_ids.length > 0)
+				content["description"] = opts["description"]
+				content["name"] = opts["name"]
+				content["groups"] = group_ids
+				self._ostrato_request(
+					"post",
+					sprintf("networks"),
+					content
+				)
+			else
+				self._success = nil
+				self._errors.push(sprintf("could not find a valid group id for at least one group name."))
+			end
+		else
+			self._success = nil
+			self._errors.push(sprintf("the following required \"%s\" options are missing: %s.", __method__, (required - opts.keys).join(", ")))
+		end
+	end
+
+	def networks_network_edit(*args)
+	end
+
+	def networks_network_get(*args)
+	end
+	
+	def networks_archive(*args)
+		opts = args[0] || Hash.new
+		content = Hash.new
+		self._output = Hash.new
+		required = %w(network_name)
+		if ((required - opts.keys).length == 0)
+			network_id = self._network_id(opts["network_name"])
+			unless (network_id)
+				self._success = nil
+				self._errors.push(sprintf("failed to fetch the network id for \"%s\".", opts["network_name"]))
+				return
+			end
+			self._ostrato_request(
+				"put",
+				sprintf("networks/%s/archive?value=true", network_id)
+			)
+		else
+			self._success = nil
+			self._errors.push(sprintf("the following required \"%s\" options are missing: %s.", __method__, (required - opts.keys).join(", ")))
+		end
+	end
+
+	def networks_deploy(*args)
+		# DO NOT TEST ON A LIVE ACCOUNT
+		opts = args[0] || Hash.new
+		content = Hash.new
+		self._output = Hash.new
+		required = %w(network_name)
+		if ((required - opts.keys).length == 0)
+			network_id = self._network_id(opts["network_name"])
+			unless (network_id)
+				self._success = nil
+				self._errors.push(sprintf("failed to fetch the network id for \"%s\".", opts["network_name"]))
+				return
+			end
+			self._ostrato_request(
+				"put",
+				sprintf("networks/%s/deploy", network_id)
+			)
+		else
+			self._success = nil
+			self._errors.push(sprintf("the following required \"%s\" options are missing: %s.", __method__, (required - opts.keys).join(", ")))
+		end
+	end
+
+	def networks_available_locations_pg(*args)
+		# Works
+		opts = args[0] || Hash.new
+		content = Hash.new
+		self._output = Hash.new
+		required = %w(provider_name group_name)
+		if ((required - opts.keys).length == 0)
+			# How the heck do I get provider ID?
+			#provider_id = self._provider_id(opts["provider_name"])
+			provider_id = 1
+			group_id = self._group_id(opts["group_name"])
+			unless (provider_id)
+				self._success = nil
+				self._errors.push(sprintf("failed to fetch the provider id for \"%s\".", opts["provider_name"]))
+				return
+			end
+			unless (group_id)
+				self._success = nil
+				self._errors.push(sprintf("failed to fetch the group id for \"%s\".", opts["group_name"]))
+				return
+			end
+			self._ostrato_request(
+				"get",
+				sprintf("providers/%s/groups/%s/locations", provider_id, group_id)
+			)
+		else
+			self._success = nil
+			self._errors.push(sprintf("the following required \"%s\" options are missing: %s.", __method__, (required - opts.keys).join(", ")))
+		end
+	end
+
+	def networks_locations_create(*args)
+	end
+
+	def networks_locations_edit(*args)
+	end
+
+	def networks_locations_get(*args)
+	end
+
+	def networks_locations(*args)
+		# Works
+		opts = args[0] || Hash.new
+		content = Hash.new
+		self._output = Hash.new
+		required = %w(network_name)
+		if ((required - opts.keys).length == 0)
+			network_id = self._network_id(opts["network_name"])
+			unless (network_id)
+				self._success = nil
+				self._errors.push(sprintf("failed to fetch the network id for \"%s\".", opts["network_name"]))
+				return
+			end
+			self._ostrato_request(
+				"get",
+				sprintf("networks/%s/locations", network_id)
+			)
+		else
+			self._success = nil
+			self._errors.push(sprintf("the following required \"%s\" options are missing: %s.", __method__, (required - opts.keys).join(", ")))
+		end
+	end
+
+	## Private clouds
+	def networks_private_clouds(*args)
+		# Works
+		opts = args[0] || Hash.new
+		content = Hash.new
+		self._output = Hash.new
+		required = %w(network_name)
+		if ((required - opts.keys).length == 0)
+			network_id = self._network_id(opts["network_name"])
+			unless (network_id)
+				self._success = nil
+				self._errors.push(sprintf("failed to fetch the network id for \"%s\".", opts["network_name"]))
+				return
+			end
+			self._ostrato_request(
+				"get",
+				sprintf("networks/%s/private_clouds", network_id)
+			)
+		else
+			self._success = nil
+			self._errors.push(sprintf("the following required \"%s\" options are missing: %s.", __method__, (required - opts.keys).join(", ")))
+		end
+	end
+
+	def networks_private_clouds_create(*args)
+		# Works
+		opts = args[0] || Hash.new
+		content = Hash.new
+		self._output = Hash.new
+		required = %w(network_name cidr_block name)
+		if ((required - opts.keys).length == 0)
+			network_id = self._network_id(opts["network_name"])
+			unless (network_id)
+				self._success = nil
+				self._errors.push(sprintf("failed to fetch the network id for \"%s\".", opts["network_name"]))
+				return
+			end
+
+			content["cidr_block"] = opts["cidr_block"]
+			content["name"] = opts["name"]
 			self._ostrato_request(
 				"post",
-				sprintf("catalogs/products"),
+				sprintf("networks/%s/private_clouds", network_id),
 				content
 			)
 		else
@@ -1601,6 +2034,195 @@ class Ostrato
 			self._errors.push(sprintf("the following required \"%s\" options are missing: %s.", __method__, (required - opts.keys).join(", ")))
 		end
 	end
+
+	def networks_private_clouds_edit(*args)
+		# Works
+		opts = args[0] || Hash.new
+		content = Hash.new
+		self._output = Hash.new
+		required = %w(network_name private_cloud_name)
+		if ((required - opts.keys).length == 0)
+			network_id, private_cloud_id = nil, nil
+			self.networks_private_clouds({"network_name" => opts["network_name"]})
+			if (self.success)
+				self.output.each do |private_cloud|
+					if (private_cloud["name"] == opts["private_cloud_name"])
+						network_id = private_cloud["network_id"]
+						private_cloud_id = private_cloud["id"]
+						self._output = Hash.new
+						break
+					end
+				end
+
+				if (network_id && private_cloud_id)
+					content["name"] = opts["new_name"] if opts["new_name"]
+					self._ostrato_request(
+						"put",
+						sprintf("networks/%s/private_clouds/%s", network_id, private_cloud_id),
+						content
+					)
+				else
+					self._success = nil
+					self._errors.push(sprintf("failed to get network id and/or private cloud id."))
+				end
+			else
+				self._success = nil
+				self._errors.push(sprintf("failed to get a list of private clouds for %s.", opts["network_name"]))
+			end
+		else
+			self._success = nil
+			self._errors.push(sprintf("the following required \"%s\" options are missing: %s.", __method__, (required - opts.keys).join(", ")))
+		end
+	end
+
+	def networks_private_clouds_get(*args)
+		# Works
+		opts = args[0] || Hash.new
+		content = Hash.new
+		self._output = Hash.new
+		required = %w(network_name private_cloud_name)
+		if ((required - opts.keys).length == 0)
+			network_id, private_cloud_id = nil, nil
+			self.networks_private_clouds({"network_name" => opts["network_name"]})
+			if (self.success)
+				self.output.each do |private_cloud|
+					if (private_cloud["name"] == opts["private_cloud_name"])
+						network_id = private_cloud["network_id"]
+						private_cloud_id = private_cloud["id"]
+						self._success = 1
+						self._output = private_cloud
+						break
+					end
+				end
+			else
+				self._success = nil
+				self._errors.push(sprintf("failed to get a list of private clouds for %s.", opts["network_name"]))
+			end
+		else
+			self._success = nil
+			self._errors.push(sprintf("the following required \"%s\" options are missing: %s.", __method__, (required - opts.keys).join(", ")))
+		end
+	end
+
+	def networks_private_clouds_archive(*args)
+		# Works
+		opts = args[0] || Hash.new
+		content = Hash.new
+		self._output = Hash.new
+		required = %w(network_name private_cloud_name)
+		if ((required - opts.keys).length == 0)
+			network_id, private_cloud_id = nil, nil
+			self.networks_private_clouds({"network_name" => opts["network_name"]})
+			if (self.success)
+				self.output.each do |private_cloud|
+					if (private_cloud["name"] == opts["private_cloud_name"])
+						network_id = private_cloud["network_id"]
+						private_cloud_id = private_cloud["id"]
+						self._output = Hash.new
+						break
+					end
+				end
+
+				if (network_id && private_cloud_id)
+					self._ostrato_request(
+						"put",
+						sprintf("networks/%s/private_clouds/%s/archive?value=true", network_id, private_cloud_id)
+					)
+				else
+					self._success = nil
+					self._errors.push(sprintf("failed to get network id and/or private cloud id."))
+				end
+			else
+				self._success = nil
+				self._errors.push(sprintf("failed to get a list of private clouds for %s.", opts["network_name"]))
+			end
+		else
+			self._success = nil
+			self._errors.push(sprintf("the following required \"%s\" options are missing: %s.", __method__, (required - opts.keys).join(", ")))
+		end
+	end
+
+	## Subnets
+	def networks_subnets(*args)
+		# Works
+		opts = args[0] || Hash.new
+		content = Hash.new
+		self._output = Hash.new
+		required = %w(network_name private_cloud_name)
+		if ((required - opts.keys).length == 0)
+			network_id, private_cloud_id = nil, nil
+			self.networks_private_clouds({"network_name" => opts["network_name"]})
+			if (self.success)
+				self.output.each do |private_cloud|
+					if (private_cloud["name"] == opts["private_cloud_name"])
+						network_id = private_cloud["network_id"]
+						private_cloud_id = private_cloud["id"]
+						self._output = Hash.new
+						break
+					end
+				end
+
+				if (network_id && private_cloud_id)
+					self._ostrato_request(
+						"get",
+						sprintf("networks/%s/private_clouds/%s/subnets", network_id, private_cloud_id)
+					)
+				else
+					self._success = nil
+					self._errors.push(sprintf("failed to get network id and/or private cloud id."))
+				end
+			else
+				self._success = nil
+				self._errors.push(sprintf("failed to get a list of private clouds for %s.", opts["network_name"]))
+			end
+		else
+			self._success = nil
+			self._errors.push(sprintf("the following required \"%s\" options are missing: %s.", __method__, (required - opts.keys).join(", ")))
+		end
+	end
+
+    def networks_subnets_create(*args)
+        # 403
+		# Need to understand the dependencies for subnets
+        opts = args[0] || Hash.new
+        content = Hash.new
+        self._output = Hash.new
+        required = %w(network_name private_cloud_name cidr_block name deployed_locations)
+        if ((required - opts.keys).length == 0)
+            network_id, private_cloud_id = nil, nil
+            self.networks_private_clouds({"network_name" => opts["network_name"]})
+            if (self.success)
+                self.output.each do |private_cloud|
+                    if (private_cloud["name"] == opts["private_cloud_name"])
+                        network_id = private_cloud["network_id"]
+                        private_cloud_id = private_cloud["id"]
+                        self._output = Hash.new
+                        break
+                    end
+                end
+
+                if (network_id && private_cloud_id)
+					content["cidr_block"] = opts["cidr_block"]
+					content["name"] = opts["name"]
+					content["deployed_locations"] = opts["deployed_locations"]
+                    self._ostrato_request(
+                        "post",
+                        sprintf("networks/%s/private_clouds/%s/subnets", network_id, private_cloud_id),
+						content
+                    )
+                else
+                    self._success = nil
+                    self._errors.push(sprintf("failed to get network id and/or private cloud id."))
+                end
+            else
+                self._success = nil
+                self._errors.push(sprintf("failed to get a list of private clouds for %s.", opts["network_name"]))
+            end
+        else
+            self._success = nil
+            self._errors.push(sprintf("the following required \"%s\" options are missing: %s.", __method__, (required - opts.keys).join(", ")))
+        end
+    end
 
 	def _ostrato_request(*args)
 		http_method = args[0]
