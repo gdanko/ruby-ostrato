@@ -2,6 +2,7 @@ require "net/https"
 require "json"
 require "pp"
 require "etc"
+require "securerandom"
 
 class Ostrato
 	attr_accessor :_success
@@ -13,6 +14,7 @@ class Ostrato
 	attr_accessor :_token
 	attr_accessor :proxy
 	attr_accessor :base_url
+	attr_accessor :providers
 
 	def initialize(opts)
 		self._urls = Array.new
@@ -22,6 +24,15 @@ class Ostrato
 		self._error_exit("you must specify your username.") unless opts["user"]
 		self._error_exit("you must specift your password.") unless opts["pass"]
 		self._token = self._get_api_key(opts["user"], opts["pass"])
+
+		self.providers = {
+			"aws" => 1,
+			"rackspace" => 2,
+			"openstack" => 3,
+			"azure" => 4,
+			"vsphere" => 5,
+			"softlayer" => 7
+		}
 	end
 
 	def debug(flag)
@@ -177,6 +188,17 @@ class Ostrato
 		end
 		self._output = Hash.new
 		return output
+	end
+
+	def _uuid()
+		return sprintf(
+			"%s-%s-%s-%s-%s",
+			SecureRandom.hex(4),
+			SecureRandom.hex(2),
+			SecureRandom.hex(2),
+			SecureRandom.hex(2),
+			SecureRandom.hex(6)
+		)
 	end
 
 	# Authentication
@@ -1612,6 +1634,23 @@ class Ostrato
 	end
 
 	# Marketplace (Catalog)
+	def catalogs_products(*args)
+		# Works
+		opts = args[0] || Hash.new
+		content = Hash.new
+		self._output = Hash.new
+		required = %w()
+		if ((required - opts.keys).length == 0)
+			self._ostrato_request(
+				"get",
+				sprintf("catalogs/products?_admin=1")
+			)
+		else
+			self._success = nil
+			self._errors.push(sprintf("the following required \"%s\" options are missing: %s.", __method__, (required - opts.keys).join(", ")))
+		end
+	end
+
 	def catalogs_products_assignable_groups(*args)
 		# Works
 		opts = args[0] || Hash.new
@@ -1929,8 +1968,7 @@ class Ostrato
 		required = %w(provider_name group_name)
 		if ((required - opts.keys).length == 0)
 			# How the heck do I get provider ID?
-			#provider_id = self._provider_id(opts["provider_name"])
-			provider_id = 1
+			provider_id = self.providers[opts["provider_name"]]
 			group_id = self._group_id(opts["group_name"])
 			unless (provider_id)
 				self._success = nil
@@ -1952,13 +1990,122 @@ class Ostrato
 		end
 	end
 
+	## Locations
 	def networks_locations_create(*args)
+		opts = args[0] || Hash.new
+		content = Hash.new
+		self._output = Hash.new
+		required = %w(network_name group_name provider_name location_name)
+		if ((required - opts.keys).length == 0)
+			network_id = self._network_id(opts["network_name"])
+			group_id = self._group_id(opts["group_name"])
+			unless (network_id)
+				self._success = nil
+				self._errors.push(sprintf("failed to fetch the network id for \"%s\".", opts["network_name"]))
+				return
+			end
+			unless (group_id)
+				self._success = nil
+				self._errors.push(sprintf("failed to fetch the group id for \"%s\".", opts["group_name"]))
+				return
+			end
+
+			self.networks_available_locations_pg({
+				"provider_name" => opts["provider_name"],
+				"group_name" => opts["group_name"]
+			})
+
+			if (self.success)
+				valid_locations = Array.new
+				self.output.each do |location|
+					valid_locations.push(location["name"])
+				end
+
+				if (valid_locations.include?(opts["location_name"]))
+					self._output = Hash.new
+
+					content["location_name"] = opts["location_name"]
+					content["name"] = opts["location_name"]
+					content["id"] = self._uuid
+					content["group_id"] = group_id
+					content["group_name"] = opts["group_name"]
+					content["groups_list"] = []
+					content["provider_name"] = opts["provider_name"]
+					content["provider_id"] = self.providers[opts["provider_name"]]
+					self._ostrato_request(
+						"post",
+						sprintf("networks/%s/locations", network_id),
+						content
+					)
+				else
+					self._success = nil
+					self._errors.push(sprintf(
+						"invalid location for provider %s. valid locations are: %s.",
+						opts["provider_name"],
+						valid_locations.sort.join(", ")
+					))
+				end
+			end
+		end
 	end
 
-	def networks_locations_edit(*args)
-	end
+	def networks_locations_delete(*args)
+		# "method networks_locations_delete failed: code=405; message=method not allowed"
+		opts = args[0] || Hash.new
+		content = Hash.new
+		self._output = Hash.new
+		required = %w(network_name group_name provider_name location_name)
+		if ((required - opts.keys).length == 0)
+			network_id = self._network_id(opts["network_name"])
+			group_id = self._group_id(opts["group_name"])
+			unless (network_id)
+				self._success = nil
+				self._errors.push(sprintf("failed to fetch the network id for \"%s\".", opts["network_name"]))
+				return
+			end
+			unless (group_id)
+				self._success = nil
+				self._errors.push(sprintf("failed to fetch the group id for \"%s\".", opts["group_name"]))
+				return
+			end
 
-	def networks_locations_get(*args)
+			self.networks_available_locations_pg({
+				"provider_name" => opts["provider_name"],
+				"group_name" => opts["group_name"]
+			})
+
+			if (self.success)
+				valid_locations = Array.new
+				self.output.each do |location|
+					valid_locations.push(location["name"])
+				end
+
+				if (valid_locations.include?(opts["location_name"]))
+					self._output = Hash.new
+
+					content["location_name"] = opts["location_name"]
+					content["name"] = opts["location_name"]
+					content["id"] = self._uuid
+					content["group_id"] = group_id
+					content["group_name"] = opts["group_name"]
+					content["groups_list"] = []
+					content["provider_name"] = opts["provider_name"]
+					content["provider_id"] = self.providers[opts["provider_name"]]
+					self._ostrato_request(
+						"delete",
+						sprintf("networks/%s/locations", network_id),
+						content
+					)
+				else
+					self._success = nil
+					self._errors.push(sprintf(
+						"invalid location for provider %s. valid locations are: %s.",
+						opts["provider_name"],
+						valid_locations.sort.join(", ")
+					))
+				end
+			end
+		end
 	end
 
 	def networks_locations(*args)
@@ -2087,8 +2234,6 @@ class Ostrato
 			if (self.success)
 				self.output.each do |private_cloud|
 					if (private_cloud["name"] == opts["private_cloud_name"])
-						network_id = private_cloud["network_id"]
-						private_cloud_id = private_cloud["id"]
 						self._success = 1
 						self._output = private_cloud
 						break
@@ -2224,6 +2369,186 @@ class Ostrato
 		end
 	end
 
+	## Firewalls
+	def networks_firewalls(*args)
+		# Works
+		opts = args[0] || Hash.new
+		content = Hash.new
+		self._output = Hash.new
+		required = %w(network_name)
+		if ((required - opts.keys).length == 0)
+			network_id = self._network_id(opts["network_name"])
+			unless (network_id)
+				self._success = nil
+				self._errors.push(sprintf("failed to fetch the network id for \"%s\".", opts["network_name"]))
+				return
+			end
+			self._ostrato_request(
+				"get",
+				sprintf("networks/%s/firewalls", network_id)
+			)
+		else
+			self._success = nil
+			self._errors.push(sprintf("the following required \"%s\" options are missing: %s.", __method__, (required - opts.keys).join(", ")))
+		end
+	end
+
+	def networks_firewalls_create(*args)
+		opts = args[0] || Hash.new
+		content = Hash.new
+		self._output = Hash.new
+		required = %w(network_name name description groups inbound outbound)
+		group_ids = Array.new
+		if ((required - opts.keys).length == 0)
+			network_id = self._network_id(opts["network_name"])
+			unless (network_id)
+				self._success = nil
+				self._errors.push(sprintf("failed to fetch the network id for \"%s\".", opts["network_name"]))
+				return
+			end
+
+			opts["groups"].split(/\s*,\s*/).each do |group_name|
+				group_id = self._group_id(group_name)
+				group_ids.push(group_id) if group_id
+			end
+
+			if (group_ids.length > 0)
+				content["ports"] = {}
+				content["name"] = opts["name"]
+				content["description"] = opts["description"]
+				content["ports"]["inbound"] = opts["inbound"]
+				content["ports"]["outbound"] = opts["outbound"]
+				content["groups"] = group_ids
+				self._ostrato_request(
+					"post",
+					sprintf("networks/%s/firewalls", network_id),
+					content
+				)
+			else
+				self._success = nil
+				self._errors.push(sprintf("could not find a valid group id for at least one group name."))
+			end
+		else
+			self._success = nil
+			self._errors.push(sprintf("the following required \"%s\" options are missing: %s.", __method__, (required - opts.keys).join(", ")))
+		end
+	end
+
+	def networks_firewalls_edit(*args)
+		# Works
+		opts = args[0] || Hash.new
+		content = Hash.new
+		self._output = Hash.new
+		required = %w(network_name firewall_name description groups inbound outbound)
+		group_ids = Array.new
+		if ((required - opts.keys).length == 0)
+			self.networks_firewalls("network_name" => opts["network_name"])
+			if (self.success)
+				firewall_obj = nil
+				self.output.each do |firewall|
+					if (firewall["name"] == opts["firewall_name"])
+						firewall_obj = firewall.clone
+						break
+					end
+				end
+				if (firewall_obj)
+					opts["groups"].split(/\s*,\s*/).each do |group_name|
+						group_id = self._group_id(group_name)
+						group_ids.push(group_id) if group_id
+					end
+
+					if (group_ids.length > 0)
+						content["ports"] = {}
+						content["name"] = opts["new_name"] if opts["new_name"]
+						content["description"] = opts["description"]
+						content["ports"]["inbound"] = opts["inbound"]
+						content["ports"]["outbound"] = opts["outbound"]
+						content["groups"] = group_ids
+						self._ostrato_request(
+				  			"put",
+							sprintf("networks/%s/firewalls/%s", firewall_obj["network_id"], firewall_obj["id"]),
+							content
+						)
+					else
+						self._success = nil
+						self._errors.push(sprintf("could not find a valid group id for at least one group name."))
+					end
+				else
+					self._success = nil
+					self._errors.push(sprintf("failed to get firewall information for %s.", opts["firewall_name"]))
+				end
+			else
+				self._success = nil
+				self.errors.push(sprintf("failed to get a list of firewalls for %s.", opts["network_name"]))
+			end
+		else
+			self._success = nil
+			self._errors.push(sprintf("the following required \"%s\" options are missing: %s.", __method__, (required - opts.keys).join(", ")))
+		end
+	end
+
+	def networks_firewalls_get(*args)
+		# Works
+		opts = args[0] || Hash.new
+		content = Hash.new
+		self._output = Hash.new
+		required = %w(network_name firewall_name)
+		if ((required - opts.keys).length == 0)
+			self.networks_firewalls("network_name" => opts["network_name"])
+			if (self.success)
+				self.output.each do |firewall|
+					if (firewall["name"] == opts["firewall_name"])
+						self._success = 1
+						self._output = firewall.clone
+						break
+					end
+				end
+			else
+				self._success = nil
+				self._errors.push(sprintf("failed to get a list of firewalls for %s.", opts["network_name"]))
+			end
+		else
+			self._success = nil
+			self._errors.push(sprintf("the following required \"%s\" options are missing: %s.", __method__, (required - opts.keys).join(", ")))
+		end
+	end
+
+	def networks_firewalls_archive(*args)
+		# Works
+		opts = args[0] || Hash.new
+		content = Hash.new
+		self._output = Hash.new
+		required = %w(network_name firewall_name)
+		if ((required - opts.keys).length == 0)
+			network_id, firewall_id = nil, nil
+			self.networks_firewalls("network_name" => opts["network_name"])
+			if (self.success)
+				self.output.each do |firewall|
+					if (firewall["name"] == opts["firewall_name"])
+						network_id = firewall["network_id"]
+						firewall_id = firewall["id"]
+						break
+					end
+				end
+				if (network_id && firewall_id)
+					self._ostrato_request(
+						"put",
+						sprintf("networks/%s/firewalls/%s/archive?value=true", network_id, firewall_id)
+					)
+				else
+					self._success = nil
+					self._errors.push(sprintf("failed to get network id and/or firewall id."))
+				end
+			else
+				self._success = nil
+				self.errors.push(sprintf("failed to get a list of firewalls for %s.", opts["network_name"]))
+			end
+		else
+			self._success = nil
+			self._errors.push(sprintf("the following required \"%s\" options are missing: %s.", __method__, (required - opts.keys).join(", ")))
+		end
+	end
+
 	def _ostrato_request(*args)
 		http_method = args[0]
 		uri = args[1]
@@ -2287,4 +2612,3 @@ class Ostrato
 		end
 	end
 end
-
