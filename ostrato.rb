@@ -23,7 +23,12 @@ class Ostrato
 
 		self._error_exit("you must specify your username.") unless opts["user"]
 		self._error_exit("you must specift your password.") unless opts["pass"]
-		self._token = self._get_api_key(opts["user"], opts["pass"])
+		self.auth({"user" => opts["user"], "pass" => opts["pass"]})
+		if (self.success)
+			self._token = self.output["token"]
+		else
+			self._error_exit(self.errors)
+		end
 
 		self.providers = {
 			"aws" => 1,
@@ -79,19 +84,6 @@ class Ostrato
 		puts("[Warn] #{text}")
 	end
 
-	def _get_api_key(user, pass)
-		content = self._ostrato_request(
-			"post",
-			"auth",
-			{ "user" => user, "pass" => pass },
-		)
-		if (self.success)
-			return content["token"]
-		else
-			self._error_exit(self.errors)
-		end
-	end
-
 	def _validate_json(string)
 		hashref = JSON.parse(string)
 		return hashref
@@ -133,6 +125,14 @@ class Ostrato
 
 	def _network_id(name)
 		return self._id(name, "networks", "name", "id")
+	end
+
+	def _parking_calendar_id(name)
+		return self._id(name, "parking_calendars", "name", "id")
+	end
+
+	def _pricing_profile_id(name)
+		return self._id(name, "pricing_profile", "name", "id")
 	end
 
 	def _instance_id(name)
@@ -198,6 +198,38 @@ class Ostrato
 			SecureRandom.hex(2),
 			SecureRandom.hex(2),
 			SecureRandom.hex(6)
+		)
+	end
+
+	def _group_ids(groups)
+		group_ids = Array.new
+		groups.split(/\s*,\s*/).each do |group_name|
+			group_id = self._group_id(group_name)
+			group_ids.push(group_id) if group_id
+		end
+		return group_ids
+	end
+
+	def _missing_opts_error(method, required, opts)
+		return sprintf(
+			"the following required \"%s\" options are missing: %s.",
+			method,
+			(required - opts.keys).join(", ")
+		)
+	end
+
+	def _id_not_found_error(type, name)
+		return sprintf(
+			"could not find %s id for %s.",
+			type,
+			name
+		)
+	end
+
+	def _failed_to_get_list_error(name)
+		return sprintf(
+			"failed to fetch the %s list.",
+			name
 		)
 	end
 
@@ -1695,22 +1727,23 @@ class Ostrato
 
 	def catalogs_products(*args)
 		# Works
-		# Add QS options
-		# _admin: when set to 1, indicates that the products in the response include all products that the user can manage. If 0, then the response will contain only the products a user can order for their current group. Any other value for this parameter is invalid.
-		# _provider: the ID of the provider you would like to filter the results on.
-		# _cloud_service_type: the name of the cloud service type you would like to filter the results on.
-		# _orderable: true|false. used when admin only wants orderable products returned.
-		# _range: <min,max> is the minimum and maximum price range, reduces the set of products based on a price range.
-		# _search: is a list of words separate by a space that should be text searched against: provider, cloud service type, title, and description.
 		# <filter_label>: any other word will indicate a product option filter_label that is used to reduce the set of products.
+		# huh??
 		opts = args[0] || Hash.new
 		content = Hash.new
 		self._output = Hash.new
 		required = %w()
+		qs = Array.new
 		if ((required - opts.keys).length == 0)
+			qs.push(sprintf("_admin=%s", opts["_admin"])) if opts["_admin"]
+			qs.push(sprintf("_provider=%s", opts["_provider"])) if opts["_provider"]
+			qs.push(sprintf("_cloud_service_type=%s", opts["_cloud_service_type"])) if opts["_cloud_service_type"]
+			qs.push(sprintf("_orderable=%s", opts["_orderable"])) if opts["_orderable"]
+			qs.push(sprintf("_range=%s", opts["_range"])) if opts["_range"]
+			qs.push(sprintf("_search=%s", opts["_search"])) if opts["_search"]
 			self._ostrato_request(
 				"get",
-				sprintf("catalogs/products")
+				sprintf("catalogs/products?%s", qs.join("&"))
 			)
 		else
 			self._success = nil
@@ -2509,7 +2542,7 @@ class Ostrato
 			end
 		else
 			self._success = nil
-			self._errors.push(sprintf("the following required \"%s\" options are missing: %s.", __method__, (required - opts.keys).join(", ")))
+			self._errors.push(self._missing_opts_error(__method__, required, opts))
 		end
 	end
 
@@ -2545,9 +2578,419 @@ class Ostrato
 			end
 		else
 			self._success = nil
-			self._errors.push(sprintf("the following required \"%s\" options are missing: %s.", __method__, (required - opts.keys).join(", ")))
+			self._errors.push(self._missing_opts_error(__method__, required, opts))
 		end
 	end
+
+	# Order Management
+	def orders(*args)
+		# Works
+		opts = args[0] || Hash.new
+		content = Hash.new
+		self._output = Hash.new
+		required = %w()
+		qs = Array.new
+		if ((required - opts.keys).length == 0)
+			qs.push(sprintf("_approve=%s", opts["_approve"])) if opts["_approve"]
+			qs.push(sprintf("_group_name=%s", opts["_group_name"])) if opts["_group_name"]
+			qs.push(sprintf("_range_date_from=%s", opts["_range_date_from"])) if opts["_range_date_from"]
+			qs.push(sprintf("_range_date_to=%s", opts["_range_date_to"])) if opts["_range_date_to"]
+			qs.push(sprintf("_range_total_from=%s", opts["_range_total_from"])) if opts["_range_total_from"]
+			qs.push(sprintf("_range_total_to=%s", opts["_range_total_to"])) if opts["_range_total_to"]
+			qs.push(sprintf("_status=%s", opts["_status"])) if opts["_status"]
+			qs.push(sprintf("_username=%s", opts["_username"])) if opts["_username"]
+			self._ostrato_request(
+				"get",
+				sprintf("orders?%s", qs.join("&"))
+			)
+		else
+			self._success = nil
+			self._errors.push(self._missing_opts_error(__method__, required, opts))
+		end
+	end
+
+	def orders_get(*args)
+	end
+
+	def orders_approve(*args)
+	end
+
+	def orders_reject(*args)
+	end
+
+	# Order Products
+	# hmm I don't know what to do here
+
+	# Parking Calendar Management
+	def parking_calendars_savings_group(*args)
+		# Works
+		opts = args[0] || Hash.new
+		content = Hash.new
+		self._output = Hash.new
+		required = %w(group_name)
+		if ((required - opts.keys).length == 0)
+			group_id = self._group_id(opts["group_name"])
+			unless (group_id)
+				self._success = nil
+				self._errors.push( self._id_not_found_error("group", opts["group_name"]) )
+				return
+			end
+			self._ostrato_request(
+				"get",
+				sprintf("parking_calendars/savings/groups/%s", group_id)
+			)
+		else
+			self._success = nil
+			self._errors.push(self._missing_opts_error(__method__, required, opts))
+		end
+	end
+
+	def parking_calendars_savings_cloud_services(*args)
+		# Works
+		opts = args[0] || Hash.new
+		content = Hash.new
+		self._output = Hash.new
+		required = %w(instance_name)
+		if ((required - opts.keys).length == 0)
+			instance_id = self._instance_id(opts["instance_name"])
+			unless (instance_id)
+				self._success = nil
+				self._errors.push( self._id_not_found_error("instance", opts["instance_name"]) )
+				return
+			end
+			self._ostrato_request(
+				"get",
+				sprintf("parking_calendars/savings/cloud_services/%s", instance_id)
+			)
+		else
+			self._success = nil
+			self._errors.push(self._missing_opts_error(__method__, required, opts))
+		end
+	end
+
+	def parking_calendars_archive(*args)
+		# Works
+		opts = args[0] || Hash.new
+		content = Hash.new
+		self._output = Hash.new
+		required = %w(name)
+		if ((required - opts.keys).length == 0)
+			parking_calendar_id = self._parking_calendar_id(opts["name"])
+			unless (parking_calendar_id)
+				self._success = nil
+				self._errors.push( self._id_not_found_error("parking calendar", opts["name"]) )
+				return
+			end
+
+			self._ostrato_request(
+				"put",
+				sprintf("parking_calendars/%s/archive?value=true", parking_calendar_id)
+			)
+		else
+			self._success = nil
+			self._errors.push(self._missing_opts_error(__method__, required, opts))
+		end
+	end
+
+	def parking_calendars(*args)
+		# Works
+		opts = args[0] || Hash.new
+		content = Hash.new
+		self._output = Hash.new
+		required = %w()
+		if ((required - opts.keys).length == 0)
+			self._ostrato_request(
+				"get",
+				sprintf("parking_calendars")
+			)
+		else
+			self._success = nil
+			self._errors.push(self._missing_opts_error(__method__, required, opts))
+		end
+	end
+
+	def parking_calendars_assignable_groups(*args)
+		# Works
+		opts = args[0] || Hash.new
+		content = Hash.new
+		self._output = Hash.new
+		required = %w()
+		if ((required - opts.keys).length == 0)
+			self._ostrato_request(
+				"get",
+				sprintf("parking_calendars/groups")
+			)
+		else
+			self._success = nil
+			self._errors.push(self._missing_opts_error(__method__, required, opts))
+		end
+	end
+
+	def parking_calendars_get(*args)
+		# Works
+		opts = args[0] || Hash.new
+		content = Hash.new
+		self._output = Hash.new
+		required = %w(parking_calendar_name)
+		if ((required - opts.keys).length == 0)
+			parking_calendar_id = self._parking_calendar_id(opts["parking_calendar_name"])
+			unless (parking_calendar_id)
+				self._success = nil
+				self._errors.push( self._id_not_found_error("parking calendar", opts["parking_calendar_name"]) )
+				return
+			end
+			self._ostrato_request(
+				"get",
+				sprintf("parking_calendars/%s", parking_calendar_id)
+			)
+		else
+			self._success = nil
+			self._errors.push(self._missing_opts_error(__method__, required, opts))
+		end	
+	end
+
+	def parking_calendars_create(*args)
+		# Works
+		opts = args[0] || Hash.new
+		content = Hash.new
+		self._output = Hash.new
+		required = %w(name times groups)
+		if ((required - opts.keys).length == 0)
+			group_ids = self._group_ids(opts["groups"])
+			if (group_ids.length > 0)
+				content["name"] = opts["name"]
+				content["times"] = opts["times"]
+				content["groups"] = group_ids
+				self._ostrato_request(
+					"post",
+					sprintf("parking_calendars"),
+					content
+				)
+			else
+				self._success = nil
+				self._errors.push(sprintf("could not find a valid group id for at least one group name."))
+			end
+		else
+			self._success = nil
+			self._errors.push(self._missing_opts_error(__method__, required, opts))
+		end
+	end
+
+	def parking_calendars_edit(*args)
+		# Works
+		opts = args[0] || Hash.new
+		content = Hash.new
+		self._output = Hash.new
+		required = %w(name times groups)
+		if ((required - opts.keys).length == 0)
+			group_ids = self._group_ids(opts["groups"])
+			if (group_ids.length > 0)
+				parking_calendar_id = self._parking_calendar_id(opts["name"])
+				unless (parking_calendar_id)
+					self._success = nil
+					self._errors.push( self._id_not_found_error("parking calendar", opts["name"]) )
+					return
+				end
+
+				content["name"] = opts["new_name"] if opts["new_name"]
+				content["times"] = opts["times"]
+				content["groups"] = group_ids
+				self._ostrato_request(
+					"put",
+					sprintf("parking_calendars/%s", parking_calendar_id),
+					content
+				)
+			else
+				self._success = nil
+				self._errors.push(sprintf("could not find a valid group id for at least one group name."))
+			end
+		else
+			self._success = nil
+			self._errors.push(self._missing_opts_error(__method__, required, opts))
+		end
+	end
+
+	# Permissions
+	def permissions(*args)
+		# Works
+		opts = args[0] || Hash.new
+		content = Hash.new
+		self._output = Hash.new
+		required = %w()
+		if ((required - opts.keys).length == 0)
+			self._ostrato_request(
+				"get",
+				sprintf("permissions")
+			)
+		else
+			self._success = nil
+			self._errors.push(self._missing_opts_error(__method__, required, opts))
+		end
+	end
+
+	def auth(*args)
+		opts = args[0] || Hash.new
+		content = Hash.new
+		self._output = Hash.new
+		required = %w(user pass)
+		if ((required - opts.keys).length == 0)
+			content["user"] = opts["user"]
+			content["pass"] = opts["pass"]
+			self._ostrato_request(
+				"post",
+				sprintf("auth"),
+				content
+			)
+		else
+			self._success = nil
+			self._errors.push(self._missing_opts_error(__method__, required, opts))
+		end
+	end
+
+	# Pricing Profiles Management
+	def pricing_profiles_archive(*args)
+		opts = args[0] || Hash.new
+		content = Hash.new
+		self._output = Hash.new
+		required = %w(name)
+		if ((required - opts.keys).length == 0)
+			pricing_profile_id = self._pricing_profile_id(opts["name"])
+			unless (pricing_profile_id)
+				self._success = nil
+				self._errors.push( self._id_not_found_error("pricing profile", opts["name"]) )
+				return
+			end
+			self._ostrato_request(
+				"put",
+				sprintf("pricing_profile/%s/archive?value=true", pricing_profile_id)
+			)
+		else
+			self._success = nil
+			self._errors.push(self._missing_opts_error(__method__, required, opts))
+		end
+	end
+
+	def pricing_profiles(*args)
+		# Works
+		opts = args[0] || Hash.new
+		content = Hash.new
+		self._output = Hash.new
+		required = %w()
+		if ((required - opts.keys).length == 0)
+			self._ostrato_request(
+				"get",
+				sprintf("pricing_profile")
+			)
+		else
+			self._success = nil
+			self._errors.push(self._missing_opts_error(__method__, required, opts))
+		end
+	end
+
+	def pricing_profiles_assignable_groups(*args)
+		# Works
+		opts = args[0] || Hash.new
+		content = Hash.new
+		self._output = Hash.new
+		required = %w()
+		if ((required - opts.keys).length == 0)
+			self._ostrato_request(
+				"get",
+				sprintf("pricing_profile/groups")
+			)
+		else
+			self._success = nil
+			self._errors.push(self._missing_opts_error(__method__, required, opts))
+		end
+	end
+
+	def pricing_profiles_create(*args)
+		# Works
+		opts = args[0] || Hash.new
+		content = Hash.new
+		self._output = Hash.new
+		required = %w(name description groups)
+		if ((required - opts.keys).length == 0)
+			group_ids = self._group_ids(opts["groups"])
+			if (group_ids.length > 0)
+				content["name"] = opts["name"]
+				content["description"] = opts["description"]
+				content["groups"] = group_ids
+				content["use_ingested_pricing"] = defined?(opts["use_ingested_pricing"]) ? opts["use_ingested_pricing"] : true
+				self._ostrato_request(
+					"post",
+					sprintf("pricing_profile"),
+					content
+				)
+			else
+				self._success = nil
+				self._errors.push(sprintf("could not find a valid group id for at least one group name."))
+			end
+		else
+			self._success = nil
+			self._errors.push(self._missing_opts_error(__method__, required, opts))
+		end
+	end
+
+	def pricing_profiles_edit(*args)
+		# Works
+		opts = args[0] || Hash.new
+		content = Hash.new
+		self._output = Hash.new
+		required = %w(name description groups)
+		if ((required - opts.keys).length == 0)
+			group_ids = self._group_ids(opts["groups"])
+			if (group_ids.length > 0)
+				pricing_profile_id = self._pricing_profile_id(opts["name"])
+				unless (pricing_profile_id)
+					self._success = nil
+					self._errors.push( self._id_not_found_error("pricing profile", opts["name"]) )
+					return
+				end
+				content["name"] = opts["new_name"] if opts["new_name"]
+				content["description"] = opts["description"]
+				content["groups"] = group_ids
+				content["use_ingested_pricing"] = defined?(opts["use_ingested_pricing"]) ? opts["use_ingested_pricing"] : true
+				self._ostrato_request(
+					"put",
+					sprintf("pricing_profile/%s", pricing_profile_id),
+					content
+				)
+			else
+				self._success = nil
+				self._errors.push(sprintf("could not find a valid group id for at least one group name."))
+			end
+		else
+			self._success = nil
+			self._errors.push(self._missing_opts_error(__method__, required, opts))
+		end
+	end
+
+    def pricing_profiles_get(*args)
+		# Works
+        opts = args[0] || Hash.new
+        content = Hash.new
+        self._output = Hash.new
+        required = %w(name)
+        if ((required - opts.keys).length == 0)
+			self.pricing_profiles
+			if (success)
+				self.output.each do |pricing_profile|
+					if (pricing_profile["name"] == opts["name"])
+						self._success = 1
+						self._output = pricing_profile
+						break
+					end
+				end
+			else
+				self._success = nil
+				self._errors.push( self._failed_to_get_list_error("pricing profile"))
+			end
+        else
+            self._success = nil
+            self._errors.push(self._missing_opts_error(__method__, required, opts))
+        end
+    end
 
 	def _ostrato_request(*args)
 		http_method = args[0]
