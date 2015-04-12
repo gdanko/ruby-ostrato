@@ -135,6 +135,14 @@ class Ostrato
 		return self._id(name, "pricing_profile", "name", "id")
 	end
 
+	def _private_cloud_id(name, network_id)
+		return self._id(name, sprintf("networks/%s/private_clouds", network_id), "name", "id")
+	end
+
+	def _rds_subnet_grouping_id(name)
+		return self._id(name, "rds/subnet_groupings", "name", "id")
+	end
+
 	def _instance_id(name)
 		output = nil
 		content = Hash.new
@@ -208,6 +216,20 @@ class Ostrato
 			group_ids.push(group_id) if group_id
 		end
 		return group_ids
+	end
+
+	def _subnet_ids(subnets, network_name, private_cloud_name)
+		subnet_names = subnets.split(/\s*,\s*/)
+		subnet_ids = Array.new
+		self.networks_subnets({"network_name" => network_name, "private_cloud_name" => private_cloud_name})
+		if (self.success)
+			self.output.each do |subnet|
+				if (subnet_names.include?(subnet["name"]))
+					subnet_ids.push(subnet["id"])
+				end
+			end
+		end
+		return subnet_ids
 	end
 
 	def _missing_opts_error(method, required, opts)
@@ -2974,18 +2996,15 @@ class Ostrato
 		self._output = Hash.new
 		required = %w(name)
 		if ((required - opts.keys).length == 0)
-			self.pricing_profiles
-			if (success)
-				self.output.each do |pricing_profile|
-					if (pricing_profile["name"] == opts["name"])
-						self._success = 1
-						self._output = pricing_profile
-						break
-					end
-				end
+			pricing_profile_id = self._pricing_profile_id(opts["name"])
+			if (pricing_profile_id)
+				self._ostrato_request(
+					"get",
+					sprintf("pricing_profile/%s", pricing_profile_id)
+				)
 			else
 				self._success = nil
-				self._errors.push( self._failed_to_get_list_error("pricing profile"))
+				self._errors.push( self._id_not_found_error("pricing profile", opts["name"]) )
 			end
 		else
 			self._success = nil
@@ -3041,15 +3060,15 @@ class Ostrato
 		required = %w(name)
 		if ((required - opts.keys).length == 0)
 			project_id = self._project_id(opts["name"])
-			unless (project_id)
+			if (project_id)
+				self._ostrato_request(
+					"get",
+					sprintf("projects/%s", project_id)
+				)
+			else
 				self._success = nil
 				self._errors.push( self._id_not_found_error("project", opts["name"]) )
-				return
 			end
-			self._ostrato_request(
-				"get",
-				sprintf("projects/%s", project_id)
-			)
 		else
 			self._success = nil
 			self._errors.push(self._missing_opts_error(__method__, required, opts))
@@ -3131,6 +3150,193 @@ class Ostrato
 		end
 	end
 
+	# RDS Subnet Groupings
+	def rds_subnet_groupings(*args)
+		# Works
+		opts = args[0] || Hash.new
+		content = Hash.new
+		self._output = Hash.new
+		required = %w()
+		if ((required - opts.keys).length == 0)
+			self._ostrato_request(
+				"get",
+				sprintf("rds/subnet_groupings")
+			)
+		else
+			self._success = nil
+			self._errors.push(self._missing_opts_error(__method__, required, opts))
+		end
+	end
+
+	def rds_subnet_groupings_create(*args)
+		# Works
+		opts = args[0] || Hash.new
+		content = Hash.new
+		self._output = Hash.new
+		required = %w(name description groups network_name private_cloud_name subnets)
+		if ((required - opts.keys).length == 0)
+			private_cloud_id = nil
+			network_id = self._network_id(opts["network_name"])
+			if (network_id)
+				private_cloud_id = self._private_cloud_id(opts["private_cloud_name"], network_id)
+				if (private_cloud_id)
+					subnet_ids = self._subnet_ids(opts["subnets"], opts["network_name"], opts["private_cloud_name"])
+					if (subnet_ids.length > 0)
+						group_ids = self._group_ids(opts["groups"])
+						if (group_ids.length > 0)
+							content["description"] = opts["description"]
+							content["groups"] = group_ids
+							content["name"] = opts["name"]
+							content["network_id"] = network_id
+							content["network_private_cloud_id"] = private_cloud_id
+							content["subnet_ids"] = subnet_ids
+							self._ostrato_request(
+								"post",
+								sprintf("rds/subnet_groupings"),
+								content
+							)
+						else
+							self._success = nil
+							self._errors.push(sprintf("could not find a valid group id for at least one group name."))
+						end
+					else
+						self._success = nil
+						self._errors.push(sprintf("could not find a valid subnet id for at least one subnet name."))
+					end
+				else
+					self._errors.push( self._id_not_found_error("private cloud", opts["private_cloud_name"]) )
+				end
+			else
+				self._errors.push( self._id_not_found_error("network", opts["network_name"]) )
+			end
+		else
+			self._success = nil
+			self._errors.push(self._missing_opts_error(__method__, required, opts))
+		end
+	end
+
+	def rds_subnet_groupings_edit(*args)
+		# Works
+		opts = args[0] || Hash.new
+		content = Hash.new
+		self._output = Hash.new
+		required = %w(name description groups network_name private_cloud_name subnets)
+		if ((required - opts.keys).length == 0)
+			rds_subnet_grouping_id = self._rds_subnet_grouping_id(opts["name"])
+			if (rds_subnet_grouping_id)
+				network_id = self._network_id(opts["network_name"])
+				if (network_id)
+					private_cloud_id = self._private_cloud_id(opts["private_cloud_name"], network_id)
+					if (private_cloud_id)
+						subnet_ids = self._subnet_ids(opts["subnets"], opts["network_name"], opts["private_cloud_name"])
+						if (subnet_ids.length > 0)
+							group_ids = self._group_ids(opts["groups"])
+							if (group_ids.length > 0)
+								content["description"] = opts["description"]
+								content["groups"] = group_ids
+								content["network_id"] = network_id
+								content["network_private_cloud_id"] = private_cloud_id
+								content["subnet_ids"] = subnet_ids
+								self._ostrato_request(
+									"put",
+									sprintf("rds/subnet_groupings/%s", rds_subnet_grouping_id),
+									content
+								)
+							else
+								self._success = nil
+								self._errors.push(sprintf("could not find a valid group id for at least one group name."))
+							end
+						else
+							self._success = nil
+							self._errors.push(sprintf("could not find a valid subnet id for at least one subnet name."))
+						end
+					else
+						self._success = nil
+						self._errors.push( self._id_not_found_error("private cloud", opts["private_cloud_name"]) )
+					end
+				else
+					self._success = nil
+					self._errors.push( self._id_not_found_error("network", opts["network_name"]) )
+				end
+			else
+				self._success = nil
+				self._errors.push( self._id_not_found_error("rds subnet grouping", opts["name"]) )
+			end
+		else
+			self._success = nil
+			self._errors.push(self._missing_opts_error(__method__, required, opts))
+		end
+	end
+
+	def rds_subnet_groupings_get(*args)
+		# Works
+		opts = args[0] || Hash.new
+		content = Hash.new
+		self._output = Hash.new
+		required = %w(name)
+		if ((required - opts.keys).length == 0)
+			rds_subnet_grouping_id = self._rds_subnet_grouping_id(opts["name"])
+			if (rds_subnet_grouping_id)
+				self._ostrato_request(
+					"get",
+					sprintf("rds/subnet_groupings/%s", rds_subnet_grouping_id)
+				)
+			else
+				self._success = nil
+				self._errors.push( self._id_not_found_error("rds subnet grouping", opts["name"]) )
+			end
+		else
+			self._success = nil
+			self._errors.push(self._missing_opts_error(__method__, required, opts))
+		end
+	end
+
+	def rds_subnet_groupings_archive(*args)
+		# Works
+		opts = args[0] || Hash.new
+		content = Hash.new
+		self._output = Hash.new
+		required = %w(name)
+		if ((required - opts.keys).length == 0)
+			rds_subnet_grouping_id = self._rds_subnet_grouping_id(opts["name"])
+			if (rds_subnet_grouping_id)
+				self._ostrato_request(
+					"put",
+					sprintf("rds/subnet_groupings/%s/archive?value=true", rds_subnet_grouping_id)
+				)
+			else
+				self._success = nil
+				self._errors.push( self._id_not_found_error("rds subnet grouping", opts["name"]) )
+			end
+		else
+			self._success = nil
+			self._errors.push(self._missing_opts_error(__method__, required, opts))
+		end
+	end
+
+	def rds_subnet_groupings_deploy(*args)
+		# Untested - do not want to deploy
+		opts = args[0] || Hash.new
+		content = Hash.new
+		self._output = Hash.new
+		required = %w(name)
+		if ((required - opts.keys).length == 0)
+			rds_subnet_grouping_id = self._rds_subnet_grouping_id(opts["name"])
+			if (rds_subnet_grouping_id)
+				self._ostrato_request(
+					"put",
+					sprintf("rds/subnet_groupings/%s/deploy", rds_subnet_grouping_id)
+				)
+			else
+				self._success = nil
+				self._errors.push( self._id_not_found_error("rds subnet grouping", opts["name"]) )
+			end
+		else
+			self._success = nil
+			self._errors.push(self._missing_opts_error(__method__, required, opts))
+		end
+	end
+
 	def _ostrato_request(*args)
 		http_method = args[0]
 		uri = args[1]
@@ -3199,6 +3405,7 @@ class Ostrato
 			else
 				message.push(sprintf("code=%s", res.code))
 				message.push(sprintf("message=%s", res.message.downcase))
+				message.push(sprintf(res.body.downcase)) if res.body
 				self._success = nil
 				self._errors.push(sprintf("method %s failed: %s", method, message.join("; ")))
 			end
