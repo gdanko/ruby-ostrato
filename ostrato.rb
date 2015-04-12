@@ -3337,6 +3337,140 @@ class Ostrato
 		end
 	end
 
+	# Reporting
+	def report_items_state(*args)
+		# Works
+		opts = args[0] || Hash.new
+		content = Hash.new
+		self._output = Hash.new
+		required = %w()
+		if ((required - opts.keys).length == 0)
+			self._ostrato_request(
+				"get",
+				sprintf("report/items/state")
+			)
+		else
+			self._success = nil
+			self._errors.push(self._missing_opts_error(__method__, required, opts))
+		end
+	end
+
+	def reports(*args)
+		# 404
+		opts = args[0] || Hash.new
+		content = Hash.new
+		self._output = Hash.new
+		required = %w()
+		if ((required - opts.keys).length == 0)
+			self._ostrato_request(
+				"get",
+				sprintf("report")
+			)
+		else
+			self._success = nil
+			self._errors.push(self._missing_opts_error(__method__, required, opts))
+		end
+	end
+
+	def report_filters(*args)
+		# detailed_billing|resource_audit|user_order_history|metric_data
+		opts = args[0] || Hash.new
+		content = Hash.new
+		self._output = Hash.new
+		required = %w(report)
+		if ((required - opts.keys).length == 0)
+			self._ostrato_request(
+				"get",
+				sprintf("report/%s", opts["report"])
+			)
+		else
+			self._success = nil
+			self._errors.push(self._missing_opts_error(__method__, required, opts))
+		end
+	end
+
+	def report_detailed_billing(*args)
+		# Works
+		opts = args[0] || Hash.new
+		content = Hash.new
+		self._output = Hash.new
+		required = %w(from_date to_date)
+		if ((required - opts.keys).length == 0)
+			# Validate against self.report_filters
+			data = Array.new
+			data.push({"type" => "date_range", "data" => {"from_date" => opts["from_date"], "to_date" => opts["to_date"]}})
+			data.push({"type" => "scope_filter", "data" => {}})
+			data.push({"type" => "export_filter", "data" => {"mimetype" => "application/json"}})
+			self._ostrato_request(
+				"post",
+				sprintf("report/detailed_billing"),
+				data
+			)
+		else
+			self._success = nil
+			self._errors.push(self._missing_opts_error(__method__, required, opts))
+		end
+	end
+
+	def report_resource_audit(*args)
+		# Works
+		opts = args[0] || Hash.new
+		content = Hash.new
+		self._output = Hash.new
+		required = %w(from_date to_date providers)
+		if ((required - opts.keys).length == 0)
+			provider_ids = Array.new
+			opts["providers"].split(/\s*,\s*/).each do |provider|
+				provider_ids.push(self.providers[provider]) if self.providers[provider]
+			end
+			if (provider_ids.length > 0)
+				data = Array.new
+				data.push({"type" => "date_range", "data" => {"from_date" => opts["from_date"], "to_date" => opts["to_date"]}})
+				data.push({"type" => "scope_filter", "data" => {"cloud_type" => ["PUBLIC"], "provider" => provider_ids}})
+				data.push({"type" => "export_filter", "data" => {"mimetype" => "application/json"}})
+				self._ostrato_request(
+					"post",
+					sprintf("report/resource_audit"),
+					data
+				)
+			else
+				self._success = nil
+				self._errors.push(sprintf("could not find a valid provider id for at least one provider name."))
+			end
+		else
+			self._success = nil
+			self._errors.push(self._missing_opts_error(__method__, required, opts))
+		end
+	end
+
+	def report_user_order_history(*args)
+		# Works
+		opts = args[0] || Hash.new
+		content = Hash.new
+		self._output = Hash.new
+		required = %w(from_date to_date)
+		if ((required - opts.keys).length == 0)
+			data = Array.new
+			data.push({"type" => "date_range", "data" => {"from_date" => opts["from_date"], "to_date" => opts["to_date"]}})
+			data.push({"type" => "scope_filter", "data" => {}})
+			data.push({"type" => "export_filter", "data" => {"mimetype" => "application/json"}})
+			self._ostrato_request(
+				"post",
+				sprintf("report/user_order_history"),
+				data
+			)
+		else
+			self._success = nil
+			self._errors.push(self._missing_opts_error(__method__, required, opts))
+		end
+	end
+
+	def report_metric_data(*args)
+	end
+
+	def report_metric_data_summary(*args)
+	end
+
 	def _ostrato_request(*args)
 		http_method = args[0]
 		uri = args[1]
