@@ -2849,6 +2849,7 @@ class Ostrato
 
 	# Pricing Profiles Management
 	def pricing_profiles_archive(*args)
+		# Works
 		opts = args[0] || Hash.new
 		content = Hash.new
 		self._output = Hash.new
@@ -2966,13 +2967,13 @@ class Ostrato
 		end
 	end
 
-    def pricing_profiles_get(*args)
+	def pricing_profiles_get(*args)
 		# Works
-        opts = args[0] || Hash.new
-        content = Hash.new
-        self._output = Hash.new
-        required = %w(name)
-        if ((required - opts.keys).length == 0)
+		opts = args[0] || Hash.new
+		content = Hash.new
+		self._output = Hash.new
+		required = %w(name)
+		if ((required - opts.keys).length == 0)
 			self.pricing_profiles
 			if (success)
 				self.output.each do |pricing_profile|
@@ -2986,11 +2987,149 @@ class Ostrato
 				self._success = nil
 				self._errors.push( self._failed_to_get_list_error("pricing profile"))
 			end
-        else
-            self._success = nil
-            self._errors.push(self._missing_opts_error(__method__, required, opts))
-        end
-    end
+		else
+			self._success = nil
+			self._errors.push(self._missing_opts_error(__method__, required, opts))
+		end
+	end
+
+	# Projects Management
+	def projects_archive(*args)
+		opts = args[0] || Hash.new
+		content = Hash.new
+		self._output = Hash.new
+		required = %w(name)
+		if ((required - opts.keys).length == 0)
+			project_id = self._project_id(opts["name"])
+			unless (project_id)
+				self._success = nil
+				self._errors.push( self._id_not_found_error("project", opts["name"]) )
+				return
+			end
+			self._ostrato_request(
+				"put",
+				sprintf("projects/%s/archive?value=true", project_id)
+			)
+		else
+			self._success = nil
+			self._errors.push(self._missing_opts_error(__method__, required, opts))
+		end
+	end
+
+	def projects(*args)
+		# Works
+		opts = args[0] || Hash.new
+		content = Hash.new
+		self._output = Hash.new
+		required = %w()
+		if ((required - opts.keys).length == 0)
+			self._ostrato_request(
+				"get",
+				sprintf("projects")
+			)
+		else
+			self._success = nil
+			self._errors.push(self._missing_opts_error(__method__, required, opts))
+		end
+	end
+
+	def projects_get(*args)
+		# Works
+		opts = args[0] || Hash.new
+		content = Hash.new
+		self._output = Hash.new
+		required = %w(name)
+		if ((required - opts.keys).length == 0)
+			project_id = self._project_id(opts["name"])
+			unless (project_id)
+				self._success = nil
+				self._errors.push( self._id_not_found_error("project", opts["name"]) )
+				return
+			end
+			self._ostrato_request(
+				"get",
+				sprintf("projects/%s", project_id)
+			)
+		else
+			self._success = nil
+			self._errors.push(self._missing_opts_error(__method__, required, opts))
+		end
+	end
+
+	def projects_assignable_groups(*args)
+		# Works
+		opts = args[0] || Hash.new
+		content = Hash.new
+		self._output = Hash.new
+		required = %w()
+		if ((required - opts.keys).length == 0)
+			self._ostrato_request(
+				"get",
+				sprintf("projects/groups")
+			)
+		else
+			self._success = nil
+			self._errors.push(self._missing_opts_error(__method__, required, opts))
+		end
+	end
+
+	def projects_create(*args)
+		# Works
+		opts = args[0] || Hash.new
+		content = Hash.new
+		self._output = Hash.new
+		required = %w(name groups)
+		if ((required - opts.keys).length == 0)
+			group_ids = self._group_ids(opts["groups"])
+			if (group_ids.length > 0)
+				content["name"] = opts["name"]
+				content["groups"] = group_ids
+				self._ostrato_request(
+					"post",
+					sprintf("projects"),
+					content
+				)
+			else
+				self._success = nil
+				self._errors.push(sprintf("could not find a valid group id for at least one group name."))
+			end
+		else
+			self._success = nil
+			self._errors.push(self._missing_opts_error(__method__, required, opts))
+		end
+	end
+
+	def projects_edit(*args)
+		# Works
+		opts = args[0] || Hash.new
+		content = Hash.new
+		self._output = Hash.new
+		required = %w(name groups)
+		if ((required - opts.keys).length == 0)
+			group_ids = self._group_ids(opts["groups"])
+			if (group_ids.length > 0)
+				project_id = self._project_id(opts["name"])
+				unless (project_id)
+					self._success = nil
+					self._errors.push( self._id_not_found_error("project", opts["name"]) )
+					return
+				end
+				content["name"] = opts["new_name"] if opts["new_name"]
+				content["groups"] = group_ids
+				self._ostrato_request(
+					"put",
+					sprintf("projects/%s", project_id),
+					content
+				)
+			else
+				self._success = nil
+				self._errors.push(sprintf("could not find a valid group id for at least one group name."))
+			end
+		else
+			self._success = nil
+			self._errors.push(self._missing_opts_error(__method__, required, opts))
+		end
+	end
 
 	def _ostrato_request(*args)
 		http_method = args[0]
@@ -3048,10 +3187,21 @@ class Ostrato
 				self._output = {}
 			end
 		else
-			message.push(sprintf("code=%s", res.code))
-			message.push(sprintf("message=%s", res.message.downcase))
-			self._success = nil
-			self._errors.push(sprintf("method %s failed: %s", method, message.join("; ")))
+			hashref = self._validate_json(res.body)
+			if (hashref)
+				self._success = nil
+				if (hashref["message"])
+					# There may be other data... check that out
+					self._errors.push(hashref["message"].downcase)
+				else
+					self._errors.push("an unknown error has occurred.")
+				end
+			else
+				message.push(sprintf("code=%s", res.code))
+				message.push(sprintf("message=%s", res.message.downcase))
+				self._success = nil
+				self._errors.push(sprintf("method %s failed: %s", method, message.join("; ")))
+			end
 		end
 	end
 end
